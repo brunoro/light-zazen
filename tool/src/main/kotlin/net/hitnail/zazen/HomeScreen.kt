@@ -1,11 +1,13 @@
 package net.hitnail.zazen
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -81,10 +83,10 @@ class HomeScreen(private val sealedActivity: SealedLightActivity) :
                 ) {
                     SectionLabel("SETTLE")
                     OptionRow {
-                        TimingOptionButton("skip", settings.settleMode == SettleMode.Skip, Modifier.weight(1f)) {
+                        OptionButton("skip", settings.settleMode == SettleMode.Skip, Modifier.weight(1f)) {
                             viewModel.update { it.copy(settleMode = SettleMode.Skip) }
                         }
-                        TimingOptionButton("2 min", settings.settleMode == SettleMode.Two, Modifier.weight(1f)) {
+                        OptionButton("2 min", settings.settleMode == SettleMode.Two, Modifier.weight(1f)) {
                             viewModel.update { it.copy(settleMode = SettleMode.Two) }
                         }
                         CustomTimingButton(
@@ -92,22 +94,21 @@ class HomeScreen(private val sealedActivity: SealedLightActivity) :
                             selected = settings.settleMode == SettleMode.Custom,
                             modifier = Modifier.weight(1f),
                         ) {
-                            if (settings.settleMode == SettleMode.Custom) {
-                                editMinutes("Settle minutes", settings.settleCustomMinutes) { minutes ->
-                                    viewModel.update { it.copy(settleCustomMinutes = minutes) }
-                                }
-                            } else {
+                            if (settings.settleMode != SettleMode.Custom) {
                                 viewModel.update { it.copy(settleMode = SettleMode.Custom) }
+                            }
+                            editMinutes("Settle minutes", settings.settleCustomMinutes) { minutes ->
+                                viewModel.update { it.copy(settleCustomMinutes = minutes) }
                             }
                         }
                     }
 
                     SectionLabel("ZAZEN")
                     OptionRow {
-                        TimingOptionButton("20 min", settings.zazenMode == ZazenMode.Twenty, Modifier.weight(1f)) {
+                        OptionButton("20 min", settings.zazenMode == ZazenMode.Twenty, Modifier.weight(1f)) {
                             viewModel.update { it.copy(zazenMode = ZazenMode.Twenty) }
                         }
-                        TimingOptionButton("40 min", settings.zazenMode == ZazenMode.Forty, Modifier.weight(1f)) {
+                        OptionButton("40 min", settings.zazenMode == ZazenMode.Forty, Modifier.weight(1f)) {
                             viewModel.update { it.copy(zazenMode = ZazenMode.Forty) }
                         }
                         CustomTimingButton(
@@ -115,12 +116,11 @@ class HomeScreen(private val sealedActivity: SealedLightActivity) :
                             selected = settings.zazenMode == ZazenMode.Custom,
                             modifier = Modifier.weight(1f),
                         ) {
-                            if (settings.zazenMode == ZazenMode.Custom) {
-                                editMinutes("Zazen minutes", settings.zazenCustomMinutes) { minutes ->
-                                    viewModel.update { it.copy(zazenCustomMinutes = minutes) }
-                                }
-                            } else {
+                            if (settings.zazenMode != ZazenMode.Custom) {
                                 viewModel.update { it.copy(zazenMode = ZazenMode.Custom) }
+                            }
+                            editMinutes("Zazen minutes", settings.zazenCustomMinutes) { minutes ->
+                                viewModel.update { it.copy(zazenCustomMinutes = minutes) }
                             }
                         }
                     }
@@ -186,51 +186,18 @@ private fun OptionButton(
 }
 
 @Composable
-private fun TimingOptionButton(
-    label: String,
-    selected: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier
-            .lightClickable(onClick = onClick)
-            .padding(vertical = 0.5f.gridUnitsAsDp()),
-    ) {
-        LightText(
-            text = "\u00a0",
-            variant = LightTextVariant.Detail,
-            align = TextAlign.Center,
-        )
-        LightText(
-            text = label,
-            variant = LightTextVariant.Copy,
-            underline = selected,
-            lighten = !selected,
-            align = TextAlign.Center,
-        )
-    }
-}
-
-@Composable
 private fun CustomTimingButton(
     minutes: Int,
     selected: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Box(
         modifier = modifier
             .lightClickable(onClick = onClick)
             .padding(vertical = 0.5f.gridUnitsAsDp()),
+        contentAlignment = Alignment.Center,
     ) {
-        LightText(
-            text = if (selected) "custom:" else "\u00a0",
-            variant = LightTextVariant.Detail,
-            align = TextAlign.Center,
-        )
         LightText(
             text = if (selected) "$minutes min" else "custom",
             variant = LightTextVariant.Copy,
@@ -238,5 +205,15 @@ private fun CustomTimingButton(
             lighten = !selected,
             align = TextAlign.Center,
         )
+        if (selected) {
+            LightText(
+                text = "custom:",
+                variant = LightTextVariant.Detail,
+                align = TextAlign.Center,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = (-1.1f).gridUnitsAsDp()),
+            )
+        }
     }
 }
