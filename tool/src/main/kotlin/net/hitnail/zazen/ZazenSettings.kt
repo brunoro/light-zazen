@@ -13,7 +13,7 @@ const val MIN_MINUTES = 1
 const val MAX_MINUTES = 180
 
 /** A preset length in minutes, or `null` for the user's custom length. */
-enum class SettleMode(val minutes: Int?) { One(1), Two(2), Custom(null) }
+enum class SettleMode(val minutes: Int?) { Skip(0), Two(2), Custom(null) }
 
 enum class ZazenMode(val minutes: Int?) { Twenty(20), Forty(40), Custom(null) }
 
@@ -26,18 +26,22 @@ enum class AlertMode(val sound: Boolean, val vibration: Boolean) {
 data class ZazenSettings(
     val settleMode: SettleMode = SettleMode.Two,
     val settleCustomMinutes: Int = 5,
-    val skipSettle: Boolean = false,
     val zazenMode: ZazenMode = ZazenMode.Forty,
     val zazenCustomMinutes: Int = 30,
     val alert: AlertMode = AlertMode.Bell,
 ) {
     val settleMinutes: Int get() = settleMode.minutes ?: settleCustomMinutes
+    val skipSettle: Boolean get() = settleMode == SettleMode.Skip
     val zazenMinutes: Int get() = zazenMode.minutes ?: zazenCustomMinutes
 }
 
 /** Whole minutes in [MIN_MINUTES]..[MAX_MINUTES], or `null` for anything else. */
 fun parseMinutes(text: CharSequence): Int? =
     text.trim().toString().toIntOrNull()?.takeIf { it in MIN_MINUTES..MAX_MINUTES }
+
+internal fun settleModeFromPreferences(modeName: String?, legacySkip: Boolean?): SettleMode =
+    if (legacySkip == true) SettleMode.Skip else
+        enumValues<SettleMode>().firstOrNull { it.name == modeName } ?: SettleMode.Two
 
 class ZazenSettingsStore(private val dataStore: DataStore<Preferences>) {
     val settings: Flow<ZazenSettings> = dataStore.data.map { it.toSettings() }
@@ -57,9 +61,8 @@ class ZazenSettingsStore(private val dataStore: DataStore<Preferences>) {
     private fun Preferences.toSettings(): ZazenSettings {
         val defaults = ZazenSettings()
         return ZazenSettings(
-            settleMode = enumOrDefault(this[SETTLE_MODE], defaults.settleMode),
+            settleMode = settleModeFromPreferences(this[SETTLE_MODE], this[SKIP_SETTLE]),
             settleCustomMinutes = this[SETTLE_CUSTOM] ?: defaults.settleCustomMinutes,
-            skipSettle = this[SKIP_SETTLE] ?: defaults.skipSettle,
             zazenMode = enumOrDefault(this[ZAZEN_MODE], defaults.zazenMode),
             zazenCustomMinutes = this[ZAZEN_CUSTOM] ?: defaults.zazenCustomMinutes,
             alert = enumOrDefault(this[ALERT], defaults.alert),

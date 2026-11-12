@@ -3,6 +3,7 @@ package net.hitnail.zazen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -17,8 +18,6 @@ import com.thelightphone.sdk.InitialScreen
 import com.thelightphone.sdk.LightScreen
 import com.thelightphone.sdk.LightViewModel
 import com.thelightphone.sdk.SealedLightActivity
-import com.thelightphone.sdk.ui.LightIcon
-import com.thelightphone.sdk.ui.LightIcons
 import com.thelightphone.sdk.ui.LightScrollView
 import com.thelightphone.sdk.ui.LightText
 import com.thelightphone.sdk.ui.LightTextVariant
@@ -81,53 +80,63 @@ class HomeScreen(private val sealedActivity: SealedLightActivity) :
                         .padding(horizontal = 1f.gridUnitsAsDp()),
                 ) {
                     SectionLabel("SETTLE")
-                    OptionRow(
-                        SettleMode.entries.map { mode ->
-                            Option(
-                                label = minutesLabel(mode.minutes, settings.settleCustomMinutes, settings.settleMode == mode),
-                                selected = settings.settleMode == mode,
-                                enabled = !settings.skipSettle,
-                            ) {
-                                if (mode == SettleMode.Custom && settings.settleMode == mode) {
-                                    editMinutes("Settle minutes", settings.settleCustomMinutes) { minutes ->
-                                        viewModel.update { it.copy(settleCustomMinutes = minutes) }
-                                    }
-                                } else {
-                                    viewModel.update { it.copy(settleMode = mode) }
+                    OptionRow {
+                        TimingOptionButton("skip", settings.settleMode == SettleMode.Skip, Modifier.weight(1f)) {
+                            viewModel.update { it.copy(settleMode = SettleMode.Skip) }
+                        }
+                        TimingOptionButton("2 min", settings.settleMode == SettleMode.Two, Modifier.weight(1f)) {
+                            viewModel.update { it.copy(settleMode = SettleMode.Two) }
+                        }
+                        CustomTimingButton(
+                            minutes = settings.settleCustomMinutes,
+                            selected = settings.settleMode == SettleMode.Custom,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            if (settings.settleMode == SettleMode.Custom) {
+                                editMinutes("Settle minutes", settings.settleCustomMinutes) { minutes ->
+                                    viewModel.update { it.copy(settleCustomMinutes = minutes) }
                                 }
+                            } else {
+                                viewModel.update { it.copy(settleMode = SettleMode.Custom) }
                             }
-                        },
-                    )
-                    Toggle("skip", settings.skipSettle) {
-                        viewModel.update { it.copy(skipSettle = !it.skipSettle) }
+                        }
                     }
 
                     SectionLabel("ZAZEN")
-                    OptionRow(
-                        ZazenMode.entries.map { mode ->
-                            Option(
-                                label = minutesLabel(mode.minutes, settings.zazenCustomMinutes, settings.zazenMode == mode),
-                                selected = settings.zazenMode == mode,
-                            ) {
-                                if (mode == ZazenMode.Custom && settings.zazenMode == mode) {
-                                    editMinutes("Zazen minutes", settings.zazenCustomMinutes) { minutes ->
-                                        viewModel.update { it.copy(zazenCustomMinutes = minutes) }
-                                    }
-                                } else {
-                                    viewModel.update { it.copy(zazenMode = mode) }
+                    OptionRow {
+                        TimingOptionButton("20 min", settings.zazenMode == ZazenMode.Twenty, Modifier.weight(1f)) {
+                            viewModel.update { it.copy(zazenMode = ZazenMode.Twenty) }
+                        }
+                        TimingOptionButton("40 min", settings.zazenMode == ZazenMode.Forty, Modifier.weight(1f)) {
+                            viewModel.update { it.copy(zazenMode = ZazenMode.Forty) }
+                        }
+                        CustomTimingButton(
+                            minutes = settings.zazenCustomMinutes,
+                            selected = settings.zazenMode == ZazenMode.Custom,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            if (settings.zazenMode == ZazenMode.Custom) {
+                                editMinutes("Zazen minutes", settings.zazenCustomMinutes) { minutes ->
+                                    viewModel.update { it.copy(zazenCustomMinutes = minutes) }
                                 }
+                            } else {
+                                viewModel.update { it.copy(zazenMode = ZazenMode.Custom) }
                             }
-                        },
-                    )
+                        }
+                    }
 
                     SectionLabel("ALERT")
-                    OptionRow(
-                        AlertMode.entries.map { mode ->
-                            Option(label = mode.name.lowercase(), selected = settings.alert == mode) {
+                    OptionRow {
+                        AlertMode.entries.forEach { mode ->
+                            OptionButton(
+                                label = mode.name.lowercase(),
+                                selected = settings.alert == mode,
+                                modifier = Modifier.weight(1f),
+                            ) {
                                 viewModel.update { it.copy(alert = mode) }
                             }
-                        },
-                    )
+                        }
+                    }
                 }
                 LightText(
                     text = if (session == SessionState.Idle) "START" else "RETURN",
@@ -143,20 +152,6 @@ class HomeScreen(private val sealedActivity: SealedLightActivity) :
     }
 }
 
-/** A selected custom option shows its length; otherwise it reads "custom". */
-private fun minutesLabel(presetMinutes: Int?, customMinutes: Int, selected: Boolean): String = when {
-    presetMinutes != null -> "$presetMinutes min"
-    selected -> "$customMinutes min"
-    else -> "custom"
-}
-
-private class Option(
-    val label: String,
-    val selected: Boolean,
-    val enabled: Boolean = true,
-    val onClick: () -> Unit,
-)
-
 @Composable
 private fun SectionLabel(text: String) {
     LightText(
@@ -167,35 +162,81 @@ private fun SectionLabel(text: String) {
 }
 
 @Composable
-private fun OptionRow(options: List<Option>) {
-    Row(Modifier.fillMaxWidth()) {
-        options.forEach { option ->
-            LightText(
-                text = option.label,
-                variant = LightTextVariant.Copy,
-                underline = option.selected,
-                lighten = !option.selected || !option.enabled,
-                modifier = Modifier
-                    .weight(1f)
-                    .lightClickable(enabled = option.enabled, onClick = option.onClick)
-                    .padding(vertical = 0.5f.gridUnitsAsDp()),
-            )
-        }
+private fun OptionRow(content: @Composable RowScope.() -> Unit) {
+    Row(Modifier.fillMaxWidth(), content = content)
+}
+
+@Composable
+private fun OptionButton(
+    label: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    LightText(
+        text = label,
+        variant = LightTextVariant.Copy,
+        underline = selected,
+        lighten = !selected,
+        align = TextAlign.Center,
+        modifier = modifier
+            .lightClickable(onClick = onClick)
+            .padding(vertical = 0.5f.gridUnitsAsDp()),
+    )
+}
+
+@Composable
+private fun TimingOptionButton(
+    label: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+            .lightClickable(onClick = onClick)
+            .padding(vertical = 0.5f.gridUnitsAsDp()),
+    ) {
+        LightText(
+            text = "\u00a0",
+            variant = LightTextVariant.Detail,
+            align = TextAlign.Center,
+        )
+        LightText(
+            text = label,
+            variant = LightTextVariant.Copy,
+            underline = selected,
+            lighten = !selected,
+            align = TextAlign.Center,
+        )
     }
 }
 
 @Composable
-private fun Toggle(label: String, on: Boolean, onClick: () -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
+private fun CustomTimingButton(
+    minutes: Int,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
             .lightClickable(onClick = onClick)
             .padding(vertical = 0.5f.gridUnitsAsDp()),
     ) {
-        LightIcon(
-            icon = if (on) LightIcons.TOGGLE_STATE_ON else LightIcons.TOGGLE_STATE_OFF,
-            modifier = Modifier.padding(end = 0.5f.gridUnitsAsDp()),
+        LightText(
+            text = if (selected) "custom:" else "\u00a0",
+            variant = LightTextVariant.Detail,
+            align = TextAlign.Center,
         )
-        LightText(text = label, variant = LightTextVariant.Copy)
+        LightText(
+            text = if (selected) "$minutes min" else "custom",
+            variant = LightTextVariant.Copy,
+            underline = selected,
+            lighten = !selected,
+            align = TextAlign.Center,
+        )
     }
 }

@@ -27,6 +27,21 @@ class ZazenSettingsTest {
     }
 
     @Test
+    fun skipSettleModeIsSelectedAndHasNoSettleDuration() {
+        val settings = ZazenSettings(settleMode = SettleMode.Skip)
+
+        assertEquals(true, settings.skipSettle)
+        assertEquals(0, settings.settleMinutes)
+    }
+
+    @Test
+    fun legacySkipPreferenceOverridesSavedSettleMode() {
+        assertEquals(SettleMode.Skip, settleModeFromPreferences("Two", legacySkip = true))
+        assertEquals(SettleMode.Two, settleModeFromPreferences("Two", legacySkip = false))
+        assertEquals(SettleMode.Two, settleModeFromPreferences("One", legacySkip = false))
+    }
+
+    @Test
     fun parseMinutesAcceptsRange() {
         assertEquals(1, parseMinutes("1"))
         assertEquals(180, parseMinutes(" 180 "))
