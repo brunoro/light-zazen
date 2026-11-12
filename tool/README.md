@@ -4,15 +4,15 @@ A zazen timer for the Light Phone III.
 
 1. Press START.
 2. Settle timer runs (1 min, 2 min or custom; can be skipped).
-3. Three bells, 5s apart.
+3. Three opening bells, about 5s apart (each gap varies from 4–6s), with a medium, full, then soft strike.
 4. Zazen timer runs (20 min, 40 min or custom).
-5. One bell.
+5. One full bell.
 
 Bells can be replaced by, or combined with, vibration. Everything keeps working while the phone is locked: the whole session plays as one detached audio queue (silence and bells), so playback keeps time.
 
 ## Bell
 
-`src/main/assets/audio/bell.wav` must be a PCM WAV no longer than 5 seconds.
+`src/main/assets/audio/bell.wav` must be a PCM WAV no longer than 5 seconds. The medium and soft opening strikes are gain-scaled copies of this source.
 
 ## Vibration
 

@@ -21,12 +21,22 @@ internal val BELL_KEYFRAMES: List<Pair<Long, Int>> = listOf(
 )
 
 /** [BELL_KEYFRAMES] linearly interpolated into [STEP_MS] segments. */
-val bellWaveform: LightVibrationWaveform by lazy {
+val bellWaveform: LightVibrationWaveform by lazy { bellWaveform(BellStrike.OpeningSecond) }
+
+private val bellWaveforms: Map<BellStrike, LightVibrationWaveform> by lazy {
+    BellStrike.entries.associateWith { strike ->
+        createBellWaveform(strike.vibrationScale)
+    }
+}
+
+internal fun bellWaveform(strike: BellStrike): LightVibrationWaveform = bellWaveforms.getValue(strike)
+
+private fun createBellWaveform(amplitudeScale: Float): LightVibrationWaveform {
     val endMs = BELL_KEYFRAMES.last().first
     val steps = (endMs / STEP_MS).toInt()
-    LightVibrationWaveform(
+    return LightVibrationWaveform(
         timingsMs = LongArray(steps) { STEP_MS },
-        amplitudes = IntArray(steps) { step -> bellAmplitudeAt(step * STEP_MS) },
+        amplitudes = IntArray(steps) { step -> (bellAmplitudeAt(step * STEP_MS) * amplitudeScale).toInt() },
     )
 }
 

@@ -14,6 +14,7 @@ import com.thelightphone.sdk.audio.LightAudioSource
 import com.thelightphone.sdk.audio.LightAudioUsage
 import com.thelightphone.sdk.audio.LightMediaMetadata
 import java.io.File
+import kotlin.random.Random
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
@@ -31,6 +32,8 @@ import kotlinx.coroutines.withContext
 
 private const val TAG = "ZazenSession"
 private const val BELL_ASSET = "audio/bell.wav"
+private const val MEDIUM_BELL_ASSET = "audio/bell-medium.wav"
+private const val SOFT_BELL_ASSET = "audio/bell-soft.wav"
 private const val END_TOLERANCE_MS = 300L
 
 sealed interface SessionState {
@@ -68,6 +71,9 @@ object ZazenSession {
             skipSettle = settings.skipSettle,
             alert = settings.alert,
             bellDurationMs = wavDurationMs(context.readAsset(BELL_ASSET)),
+            openingStrikeSpacingsMs = List(OPENING_BELLS - 1) {
+                BELL_SPACING_MS + Random.nextLong(-MAX_OPENING_STRIKE_JITTER_MS, MAX_OPENING_STRIKE_JITTER_MS + 1L)
+            },
         )
         val session = Session(
             plan = plan,
@@ -97,7 +103,11 @@ object ZazenSession {
     private suspend fun run(session: Session, filesDir: File) {
         val plan = session.plan
         val player = session.player
-        session.items = withContext(Dispatchers.IO) { plan.segments.map { it.toAudioItem(filesDir) } }
+        session.items = withContext(Dispatchers.IO) {
+            plan.segments.mapIndexed { index, segment ->
+                segment.toAudioItem(filesDir, plan.bellStrikeAt(index))
+            }
+        }
         if (!player.awaitReady()) {
             Log.e(TAG, "Player released before it was ready")
             end(SessionState.Idle)
@@ -112,8 +122,8 @@ object ZazenSession {
                     .filter { it in plan.segments.indices }
                     .distinctUntilChanged()
                     .collect { index ->
-                        if (plan.segments[index].strike) {
-                            session.vibrator?.vibrate(bellWaveform, LightVibrationUsage.Alarm)
+                        plan.bellStrikeAt(index)?.let { strike ->
+                            session.vibrator?.vibrate(bellWaveform(strike), LightVibrationUsage.Alarm)
                         }
                     }
             }
@@ -162,7 +172,7 @@ object ZazenSession {
     }
 }
 
-private fun Segment.toAudioItem(filesDir: File): LightAudioItem {
+private fun Segment.toAudioItem(filesDir: File, strike: BellStrike?): LightAudioItem {
     val metadata = LightMediaMetadata(
         title = when (phase) {
             Phase.Settle -> "Settle"
@@ -173,7 +183,13 @@ private fun Segment.toAudioItem(filesDir: File): LightAudioItem {
         durationMs = clip.durationMs,
     )
     val source = when (clip) {
-        is Clip.Bell -> LightAudioSource.AssetSource(BELL_ASSET)
+        is Clip.Bell -> LightAudioSource.AssetSource(
+            when (strike) {
+                BellStrike.OpeningFirst -> MEDIUM_BELL_ASSET
+                BellStrike.OpeningThird -> SOFT_BELL_ASSET
+                else -> BELL_ASSET
+            },
+        )
         is Clip.Silence -> LightAudioSource.FileSource(silenceFile(filesDir, clip.durationMs))
     }
     return LightAudioItem(source, metadata)

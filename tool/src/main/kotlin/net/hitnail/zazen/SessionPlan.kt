@@ -2,10 +2,18 @@ package net.hitnail.zazen
 
 /** Time between consecutive bell strikes. */
 const val BELL_SPACING_MS = 5_000L
+const val MAX_OPENING_STRIKE_JITTER_MS = 1_000L
 const val OPENING_BELLS = 3
 private const val MINUTE_MS = 60_000L
 
 enum class Phase { Settle, OpeningBells, Zazen, ClosingBell }
+
+enum class BellStrike(val vibrationScale: Float) {
+    OpeningFirst(0.75f),
+    OpeningSecond(1f),
+    OpeningThird(0.5f),
+    Closing(1f),
+}
 
 sealed interface Clip {
     val durationMs: Long
@@ -37,6 +45,23 @@ class SessionPlan(
 ) {
     val openingBellsIndex: Int = segments.indexOfFirst { it.phase == Phase.OpeningBells }
 
+    fun bellStrikeAt(index: Int): BellStrike? {
+        val segment = segments[index]
+        if (!segment.strike) return null
+        return when (segment.phase) {
+            Phase.OpeningBells -> when (
+                segments.take(index + 1).count { it.phase == Phase.OpeningBells && it.strike }
+            ) {
+                1 -> BellStrike.OpeningFirst
+                2 -> BellStrike.OpeningSecond
+                3 -> BellStrike.OpeningThird
+                else -> null
+            }
+            Phase.ClosingBell -> BellStrike.Closing
+            else -> null
+        }
+    }
+
     fun progressAt(index: Int, positionMs: Long): Progress {
         val segment = segments[index]
         val currentMs = (segment.clip.durationMs - positionMs).coerceIn(0L, segment.clip.durationMs)
@@ -58,27 +83,35 @@ fun buildSessionPlan(
     skipSettle: Boolean,
     alert: AlertMode,
     bellDurationMs: Long,
+    openingStrikeSpacingsMs: List<Long> = List(OPENING_BELLS - 1) { BELL_SPACING_MS },
 ): SessionPlan {
     require(bellDurationMs > 0L) { "Bell must have a duration" }
+    require(openingStrikeSpacingsMs.size == OPENING_BELLS - 1) {
+        "Expected ${OPENING_BELLS - 1} opening strike spacings"
+    }
+    require(openingStrikeSpacingsMs.all { it > 0L }) { "Opening strike spacings must be positive" }
 
-    fun bellSlot(phase: Phase, trailingSilence: Boolean): List<Segment> = if (alert.sound) {
+    fun bellSlot(phase: Phase, slotDurationMs: Long, trailingSilence: Boolean): List<Segment> = if (alert.sound) {
         listOfNotNull(
             Segment(phase, Clip.Bell(bellDurationMs), strike = true),
-            (BELL_SPACING_MS - bellDurationMs)
+            (slotDurationMs - bellDurationMs)
                 .takeIf { trailingSilence && it > 0L }
                 ?.let { Segment(phase, Clip.Silence(it)) },
         )
     } else {
-        listOf(Segment(phase, Clip.Silence(BELL_SPACING_MS), strike = true))
+        listOf(Segment(phase, Clip.Silence(slotDurationMs), strike = true))
     }
 
     fun minutes(phase: Phase, count: Int) = List(count) { Segment(phase, Clip.Silence(MINUTE_MS)) }
 
     val segments = buildList {
         addAll(minutes(Phase.Settle, settleMinutes))
-        repeat(OPENING_BELLS) { addAll(bellSlot(Phase.OpeningBells, trailingSilence = true)) }
+        repeat(OPENING_BELLS) { strike ->
+            val spacing = openingStrikeSpacingsMs.getOrElse(strike) { BELL_SPACING_MS }
+            addAll(bellSlot(Phase.OpeningBells, spacing, trailingSilence = true))
+        }
         addAll(minutes(Phase.Zazen, zazenMinutes))
-        addAll(bellSlot(Phase.ClosingBell, trailingSilence = false))
+        addAll(bellSlot(Phase.ClosingBell, BELL_SPACING_MS, trailingSilence = false))
     }
     val plan = SessionPlan(segments, startIndex = 0, zazenMinutes = zazenMinutes)
     return if (skipSettle) SessionPlan(segments, plan.openingBellsIndex, zazenMinutes) else plan
