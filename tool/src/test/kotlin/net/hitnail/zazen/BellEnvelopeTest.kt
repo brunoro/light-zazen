@@ -7,12 +7,12 @@ import kotlin.test.assertTrue
 class BellEnvelopeTest {
     @Test
     fun waveformSpansFiveSeconds() {
-        assertEquals(BELL_SPACING_MS, bellWaveform.durationMs)
+        assertEquals(BELL_SPACING_MS, bellWaveform.duration.inWholeMilliseconds)
     }
 
     @Test
     fun waveformStrikesHardThenNeverRises() {
-        val amplitudes = bellWaveform.amplitudes.toList()
+        val amplitudes = bellWaveform.amplitudes.map { it.value }
 
         assertEquals(255, amplitudes.first())
         assertTrue(amplitudes.zipWithNext().all { (a, b) -> b <= a })

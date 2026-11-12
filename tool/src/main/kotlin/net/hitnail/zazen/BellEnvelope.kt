@@ -1,6 +1,8 @@
 package net.hitnail.zazen
 
 import com.thelightphone.sdk.LightVibrationWaveform
+import com.thelightphone.sdk.VibrationAmplitude
+import kotlin.time.Duration.Companion.milliseconds
 
 private const val STEP_MS = 50L
 
@@ -35,8 +37,10 @@ private fun createBellWaveform(amplitudeScale: Float): LightVibrationWaveform {
     val endMs = BELL_KEYFRAMES.last().first
     val steps = (endMs / STEP_MS).toInt()
     return LightVibrationWaveform(
-        timingsMs = LongArray(steps) { STEP_MS },
-        amplitudes = IntArray(steps) { step -> (bellAmplitudeAt(step * STEP_MS) * amplitudeScale).toInt() },
+        durations = List(steps) { STEP_MS.milliseconds },
+        amplitudes = List(steps) { step ->
+            VibrationAmplitude((bellAmplitudeAt(step * STEP_MS) * amplitudeScale).toInt())
+        },
     )
 }
 

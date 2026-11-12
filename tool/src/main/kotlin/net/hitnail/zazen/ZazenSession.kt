@@ -1,7 +1,6 @@
 package net.hitnail.zazen
 
 import android.util.Log
-import com.thelightphone.sdk.DefaultLightVibrator
 import com.thelightphone.sdk.LightVibrationUsage
 import com.thelightphone.sdk.LightVibrator
 import com.thelightphone.sdk.SealedLightActivity
@@ -78,7 +77,7 @@ object ZazenSession {
         val session = Session(
             plan = plan,
             player = DefaultLightAudio(sealedActivity).newPlayer(LightAudioUsage.Alarm, LightAudioPlayback.Detached),
-            vibrator = if (settings.alert.vibration) DefaultLightVibrator(sealedActivity) else null,
+            vibrator = if (settings.alert.vibration) sealedActivity.vibrator else null,
         )
         current = session
         _state.value = SessionState.Running(plan.progressAt(plan.startIndex, 0L), plan.zazenMinutes)
